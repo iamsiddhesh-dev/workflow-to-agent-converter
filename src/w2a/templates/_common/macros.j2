@@ -1,0 +1,23 @@
+{% macro agents_block(agents) -%}
+{% for a in agents %}
+{{ a.var }} = Agent(
+    role={{ a.role | pyrepr }},
+    goal={{ a.goal | pyrepr }},
+    backstory={{ a.backstory | pyrepr }},
+    llm=_llm,
+    verbose=True,
+)
+{% endfor %}
+{%- endmacro %}
+
+{% macro task_kwargs(t) %}
+    description={{ t.description | pyrepr }},
+    expected_output={{ t.expected_output | pyrepr }},
+    agent={{ t.agent_var }},
+{% if t.depends_on_vars %}
+    context=[{{ t.depends_on_vars | join(', ') }}],
+{% endif %}
+{% if t.human_checkpoint %}
+    human_input=True,
+{% endif %}
+{%- endmacro %}
