@@ -97,8 +97,13 @@ def _topo_order(tasks: list[TaskSpec]) -> list[TaskSpec]:
     return ordered
 
 
-def build_context(spec: WorkflowSpec, pattern: Pattern) -> dict:
-    """Build the Jinja2 render context for one spec+pattern combination."""
+def build_context(spec: WorkflowSpec, pattern: Pattern, resolutions: dict | None = None) -> dict:
+    """Build the Jinja2 render context for one spec+pattern combination.
+
+    ``resolutions`` maps tool id -> registry resolution (``w2a.generate.registry``);
+    duck-typed here (a resolved builtin has ``.source``) so templates stay a layer
+    below the generator. ``None`` keeps the Phase-3 behavior: every tool is a stub.
+    """
     agent_var = {a.id: f"agent_{a.id}" for a in spec.agents}
     ordered_tasks = _topo_order(list(spec.tasks))
     depended_upon = {dep for t in spec.tasks for dep in t.depends_on}
@@ -132,8 +137,15 @@ def build_context(spec: WorkflowSpec, pattern: Pattern) -> dict:
         for t in ordered_tasks
     ]
 
-    tools = [
-        {
+    tools: list[dict] = []
+    tool_imports: list[str] = []
+    tool_objects: list[str] = []
+    emitted_builtins: set[str] = set()
+    has_stub_tools = False
+    for tool in spec.tools:
+        res = (resolutions or {}).get(tool.id)
+        source = getattr(res, "source", None)
+        entry = {
             "id": tool.id,
             "func": tool.id,
             "name": tool.name,
@@ -141,9 +153,25 @@ def build_context(spec: WorkflowSpec, pattern: Pattern) -> dict:
             "category": tool.category,
             "inputs": tool.inputs,
             "outputs": tool.outputs,
+            "resolved": source is not None,
+            "builtin_name": None,
+            "source": None,
+            "emit_source": False,
         }
-        for tool in spec.tools
-    ]
+        if source is not None:
+            entry["builtin_name"] = res.name
+            entry["source"] = source
+            entry["emit_source"] = res.name not in emitted_builtins
+            emitted_builtins.add(res.name)
+            if res.name not in tool_objects:
+                tool_objects.append(res.name)
+            for imp in res.imports:
+                if imp not in tool_imports:
+                    tool_imports.append(imp)
+        else:
+            has_stub_tools = True
+            tool_objects.append(tool.id)
+        tools.append(entry)
 
     return {
         "workflow": {
@@ -158,6 +186,9 @@ def build_context(spec: WorkflowSpec, pattern: Pattern) -> dict:
         "agents": agents,
         "tasks": tasks,
         "tools": tools,
+        "tool_imports": sorted(tool_imports),
+        "tool_objects": tool_objects,
+        "has_stub_tools": has_stub_tools,
         "assumptions": list(spec.assumptions),
     }
 
@@ -174,10 +205,9 @@ def _environment() -> Environment:
     return env
 
 
-def render_pattern(spec: WorkflowSpec, pattern: Pattern) -> dict[str, str]:
-    """Render one pattern's template set against a spec. Returns {output filename: content}."""
+def render_files(context: dict, pattern: Pattern) -> dict[str, str]:
+    """Render one pattern's template set from a prebuilt context (gap-fill re-renders with this)."""
     env = _environment()
-    context = build_context(spec, pattern)
     pattern_dir = PATTERN_DIRS[pattern]
     rendered: dict[str, str] = {}
     for filename in OUTPUT_FILES:
@@ -185,3 +215,8 @@ def render_pattern(spec: WorkflowSpec, pattern: Pattern) -> dict[str, str]:
         template = env.get_template(f"{pattern_dir}/{template_name}")
         rendered[filename] = template.render(**context)
     return rendered
+
+
+def render_pattern(spec: WorkflowSpec, pattern: Pattern, resolutions: dict | None = None) -> dict[str, str]:
+    """Render one pattern's template set against a spec. Returns {output filename: content}."""
+    return render_files(build_context(spec, pattern, resolutions), pattern)

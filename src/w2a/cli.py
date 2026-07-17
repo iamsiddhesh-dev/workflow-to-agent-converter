@@ -5,8 +5,8 @@ import typer
 from dotenv import load_dotenv
 
 from w2a.logging_config import setup_logging
+from w2a.pipeline.graph import run_pipeline
 from w2a.spec.ambiguity import format_questions, score
-from w2a.spec.lint import lint
 from w2a.spec.model import human_summary
 from w2a.spec.translate import translate
 
@@ -23,11 +23,12 @@ def _read_source(source: str) -> str:
 def convert(
     source: str = typer.Argument(..., help="Path to a workflow description file, or '-' for stdin."),
     interactive: bool = typer.Option(False, "--interactive", help="Ask clarifying questions live."),
+    out: str = typer.Option("generated", "--out", help="Root directory for generated projects."),
 ) -> None:
-    """Convert a plain-language workflow description into a WorkflowSpec.
+    """Convert a plain-language workflow description into a runnable CrewAI project.
 
-    Phase 2 stops at the spec: translate, lint, and route ambiguities to clarify
-    mode or proceed-with-assumptions. Project generation lands in Phase 4.
+    Translate -> clarify-or-proceed -> lint -> select pattern -> render -> LLM
+    gap-fill -> write to <out>/<slug>/ with a provenance manifest.
     """
     description = _read_source(source)
     spec = translate(description)
@@ -47,17 +48,35 @@ def convert(
             raise typer.Exit(code=2)
 
     typer.echo(human_summary(spec))
-    errors = [i for i in lint(spec) if i.severity == "error"]
-    warnings = [i for i in lint(spec) if i.severity == "warning"]
-    if warnings:
-        typer.echo("\nLint warnings:")
-        for w in warnings:
-            typer.echo(f"  {w}")
-    if errors:
-        typer.echo("\nLint errors:")
-        for e in errors:
-            typer.echo(f"  {e}")
+
+    state = run_pipeline(source=description, spec=spec, out_root=out, pre_translated=True)
+
+    for warning in state.get("warnings", []):
+        typer.echo(f"warning: {warning}")
+
+    if state["errors"]:
+        typer.echo("\nPipeline errors:")
+        for error in state["errors"]:
+            typer.echo(f"  {error}")
         raise typer.Exit(code=1)
+
+    selection = state["selection"]
+    typer.echo(
+        f"\nPattern: {selection.pattern} "
+        f"({selection.source}, confidence {selection.confidence:.2f}) — {selection.reasoning}"
+    )
+    for tool in state["manifest"]["tools"]:
+        if tool["resolution"] == "builtin":
+            typer.echo(f"tool {tool['tool_id']}: resolved to builtin {tool['builtin']}")
+        else:
+            typer.echo(f"tool {tool['tool_id']}: MOCK_MODE stub ({tool['reason']})")
+
+    result = state["write_result"]
+    if result.no_op:
+        typer.echo(f"\nProject already up to date: {result.project_dir}")
+    else:
+        typer.echo(f"\nProject written to {result.project_dir} ({len(result.written)} file(s))")
+    typer.echo(f"Run it: cd {result.project_dir} && pip install -r requirements.txt && MOCK_MODE=1 python main.py")
     raise typer.Exit(code=0)
 
 
