@@ -1,9 +1,12 @@
-{% macro agents_block(agents) -%}
+{% macro agents_block(agents, has_tools=false) -%}
 {% for a in agents %}
 {{ a.var }} = Agent(
     role={{ a.role | pyrepr }},
     goal={{ a.goal | pyrepr }},
     backstory={{ a.backstory | pyrepr }},
+{% if has_tools %}
+    tools=ALL_TOOLS,
+{% endif %}
     llm=_llm,
     verbose=True,
 )

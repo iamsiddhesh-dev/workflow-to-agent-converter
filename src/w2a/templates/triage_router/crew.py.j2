@@ -15,10 +15,13 @@ from crewai.tasks.conditional_task import ConditionalTask
 from crewai.tasks.task_output import TaskOutput
 
 from config import build_llm
+{% if tools %}
+from tools import ALL_TOOLS
+{% endif %}
 
 _llm = build_llm()
 
-{{ m.agents_block(agents) }}
+{{ m.agents_block(agents, tools | length > 0) }}
 
 def _matches(keywords):
     """Condition factory: true if any keyword shows up in the upstream task's raw output."""
