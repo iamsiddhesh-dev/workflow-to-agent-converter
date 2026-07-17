@@ -23,3 +23,6 @@ generated/_debug/
 # local LLM call logs (token/provider logging from llm.py)
 logs/
 
+# personal phase notes — local learning journal, not part of the repo deliverable
+phase-*-notes.md
+
