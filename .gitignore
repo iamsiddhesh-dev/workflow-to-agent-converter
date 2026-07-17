@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.env
+.ruff_cache/
+.pytest_cache/
+
+# generated output projects (keep dir, ignore contents except committed samples)
+generated/*
+!generated/.gitkeep
+!generated/samples/
+
+# debug dumps from failed LLM parses
+generated/_debug/
+
+.DS_Store
+
+# local LLM call logs (token/provider logging from llm.py)
+logs/
+
