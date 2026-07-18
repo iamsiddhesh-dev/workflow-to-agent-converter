@@ -1,0 +1,90 @@
+{
+  "agents": [
+    {
+      "backstory_hint": "Methodical analyst who excels at gathering disparate data points from various systems.",
+      "goal": "Gather closed engineering tickets, support queue statistics, and financial spend data.",
+      "id": "data_aggregator",
+      "role": "Data Analyst"
+    },
+    {
+      "backstory_hint": "Clear communicator who turns raw data into human-readable insights.",
+      "goal": "Synthesize raw data into a narrative-driven report formatted in Markdown.",
+      "id": "report_writer",
+      "role": "Report Drafter"
+    }
+  ],
+  "ambiguities": [],
+  "assumptions": [
+    "The finance file in the shared folder is consistently named or easily discoverable.",
+    "The report is considered 'ready' when the Markdown file is created and awaiting the user's manual review."
+  ],
+  "flow": {
+    "edges": [
+      [
+        "gather_metrics",
+        "write_report"
+      ]
+    ],
+    "pattern": "report"
+  },
+  "tasks": [
+    {
+      "agent_id": "data_aggregator",
+      "depends_on": [],
+      "description": "Fetch closed tickets from Jira, ticket counts and categories from Zendesk, and the latest spend data from the finance folder.",
+      "expected_output": "A consolidated dataset containing shipping info, support metrics, and financial figures.",
+      "human_checkpoint": false,
+      "id": "gather_metrics"
+    },
+    {
+      "agent_id": "report_writer",
+      "depends_on": [
+        "gather_metrics"
+      ],
+      "description": "Write a narrative status report as a Markdown file, covering shipping, blockers, burn rate, and customer escalations.",
+      "expected_output": "A completed Markdown report ready for review.",
+      "human_checkpoint": true,
+      "id": "write_report"
+    }
+  ],
+  "tools": [
+    {
+      "category": "external",
+      "id": "jira_reader",
+      "inputs": "date range (last 7 days)",
+      "name": "Jira API Client",
+      "outputs": "list of closed tickets",
+      "purpose": "Retrieve completed engineering tickets."
+    },
+    {
+      "category": "external",
+      "id": "zendesk_reader",
+      "inputs": "date range (last 7 days)",
+      "name": "Zendesk API Client",
+      "outputs": "support metrics summary",
+      "purpose": "Retrieve support ticket volume and categories."
+    },
+    {
+      "category": "builtin",
+      "id": "file_reader",
+      "inputs": "file path",
+      "name": "Shared Folder Reader",
+      "outputs": "financial status data",
+      "purpose": "Read the finance data file from the shared folder."
+    },
+    {
+      "category": "builtin",
+      "id": "report_generator",
+      "inputs": "consolidated data",
+      "name": "Markdown Generator",
+      "outputs": "markdown file path",
+      "purpose": "Write the final report as a Markdown file."
+    }
+  ],
+  "workflow": {
+    "category": "ops",
+    "description": "Aggregate shipping status, support metrics, and financial data into a single, cohesive status report every Friday for review.",
+    "name": "Weekly Founders Report",
+    "trigger": "Every Friday morning."
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "agents": [
+    {
+      "backstory_hint": "Analytical engineer with a strong grasp of system architecture and incident prioritization.",
+      "goal": "Analyze bug reports to determine severity and identify the relevant service module.",
+      "id": "triage_analyst",
+      "role": "Bug Triage Analyst"
+    },
+    {
+      "backstory_hint": "Organized administrative assistant who keeps the backlog clean and action-oriented.",
+      "goal": "File bug reports into the tracking system with proper labeling and owner assignment.",
+      "id": "tracking_admin",
+      "role": "Issue Tracker"
+    }
+  ],
+  "ambiguities": [
+    "What is the specific tool used for issue tracking (Jira, Linear, GitHub Issues) so the correct API can be used?",
+    "What is the specific communication channel (e.g., Slack, Email, PagerDuty) used for the human checkpoint notification?"
+  ],
+  "assumptions": [
+    "The tracking system is a generic issue tracker (e.g., Jira, Linear, or GitHub Issues).",
+    "Non-P0 issues bypass the human checkpoint and proceed directly to filing.",
+    "The 'Service-to-Team' map is a static data structure accessible to the triage agent."
+  ],
+  "flow": {
+    "edges": [
+      [
+        "analyze_bug",
+        "confirm_p0"
+      ],
+      [
+        "confirm_p0",
+        "file_issue"
+      ]
+    ],
+    "pattern": "approval"
+  },
+  "tasks": [
+    {
+      "agent_id": "triage_analyst",
+      "depends_on": [],
+      "description": "Examine the incoming bug report for severity (e.g., P0 vs non-critical) and map the issue to a service/team based on the description or stack trace.",
+      "expected_output": "A severity assessment, a target service module, and an estimated owner for the issue.",
+      "human_checkpoint": false,
+      "id": "analyze_bug"
+    },
+    {
+      "agent_id": "triage_analyst",
+      "depends_on": [
+        "analyze_bug"
+      ],
+      "description": "Review the high-severity P0 classification to confirm if it warrants immediate paging/escalation.",
+      "expected_output": "Confirmation of P0 status or a downgrade to a lower priority.",
+      "human_checkpoint": true,
+      "id": "confirm_p0"
+    },
+    {
+      "agent_id": "tracking_admin",
+      "depends_on": [
+        "confirm_p0"
+      ],
+      "description": "Create an issue in the tracking system with the severity label and suggested owner assigned.",
+      "expected_output": "A successfully created issue record in the bug tracking system.",
+      "human_checkpoint": false,
+      "id": "file_issue"
+    }
+  ],
+  "tools": [
+    {
+      "category": "external",
+      "id": "bug_tracker_api",
+      "inputs": "severity label, owner, description, stack trace",
+      "name": "Bug Tracker Connector",
+      "outputs": "issue ticket link",
+      "purpose": "File bug reports with appropriate metadata."
+    },
+    {
+      "category": "builtin",
+      "id": "service_mapper",
+      "inputs": "stack trace or service description",
+      "name": "Service-to-Team Mapper",
+      "outputs": "suggested team owner",
+      "purpose": "Identify the responsible team based on service or component tags."
+    }
+  ],
+  "workflow": {
+    "category": "ops",
+    "description": "Standardize bug intake by analyzing severity and service area, then routing them to the appropriate team or triggering a human review for critical outages.",
+    "name": "Bug Triage and Routing",
+    "trigger": "A new entry in the shared intake form containing a bug report, Sentry alert, or support ticket."
+  }
+}
