@@ -10,7 +10,11 @@ from __future__ import annotations
 
 from crewai import Agent, Crew, Process, Task
 
+{% if has_human_checkpoint %}
+from config import MOCK_MODE, build_llm
+{% else %}
 from config import build_llm
+{% endif %}
 {% if tools %}
 from tools import ALL_TOOLS
 {% endif %}

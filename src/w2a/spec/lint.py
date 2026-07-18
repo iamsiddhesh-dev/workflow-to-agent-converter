@@ -9,21 +9,10 @@ of the (expensive, non-deterministic) LLM path.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from w2a.spec.model import WorkflowSpec
-
-_STOPWORDS = {
-    "the", "and", "for", "with", "that", "this", "into", "from", "each", "any",
-    "per", "over", "them", "then", "when", "what", "which", "their", "your",
-    "task", "tool", "workflow", "agent", "create", "provide", "generate",
-}
-
-
-def _content_words(text: str) -> set[str]:
-    """Lowercased alphabetic tokens of length >= 4, minus generic stopwords."""
-    return {w for w in re.findall(r"[a-z]{4,}", text.lower()) if w not in _STOPWORDS}
+from w2a.spec.textutils import content_words_set as _content_words
 
 
 @dataclass(frozen=True)

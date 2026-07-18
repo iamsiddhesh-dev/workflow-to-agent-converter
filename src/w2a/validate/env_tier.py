@@ -42,46 +42,36 @@ def _venv_python(venv_dir: Path) -> Path:
     return venv_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
-def _create_venv(venv_dir: Path, base_python: str) -> tuple[bool, str | None]:
-    if shutil.which("uv"):
+def _run(argv: list[str], *, timeout: float, **kw) -> tuple[bool, str | None]:
+    """subprocess.run wrapper that turns a timeout into a clean (False, message)
+    result instead of letting ``TimeoutExpired`` propagate as a bare traceback —
+    a validator tier must never crash out of the caller regardless of load."""
+    try:
         result = subprocess.run(
-            ["uv", "venv", "--python", base_python, str(venv_dir)],
-            capture_output=True,
-            encoding="utf-8", errors="replace",
-            timeout=120,
+            argv, capture_output=True, encoding="utf-8", errors="replace", timeout=timeout, **kw
         )
-        if result.returncode == 0:
-            return True, None
-        # fall through to stdlib venv on any uv failure
-    result = subprocess.run(
-        [base_python, "-m", "venv", str(venv_dir)],
-        capture_output=True,
-        encoding="utf-8", errors="replace",
-        timeout=120,
-    )
+    except subprocess.TimeoutExpired:
+        return False, f"timed out after {timeout}s: {' '.join(argv)}"
     if result.returncode != 0:
         return False, (result.stderr or result.stdout).strip()
     return True, None
+
+
+def _create_venv(venv_dir: Path, base_python: str) -> tuple[bool, str | None]:
+    if shutil.which("uv"):
+        ok, err = _run(["uv", "venv", "--python", base_python, str(venv_dir)], timeout=120)
+        if ok:
+            return True, None
+        # fall through to stdlib venv on any uv failure
+    return _run([base_python, "-m", "venv", str(venv_dir)], timeout=120)
 
 
 def _install_requirements(venv_python: Path, requirements: Path) -> tuple[bool, str | None]:
     if shutil.which("uv"):
-        result = subprocess.run(
-            ["uv", "pip", "install", "--python", str(venv_python), "-r", str(requirements)],
-            capture_output=True,
-            encoding="utf-8", errors="replace",
-            timeout=DEFAULT_TIMEOUT,
-        )
+        argv = ["uv", "pip", "install", "--python", str(venv_python), "-r", str(requirements)]
     else:
-        result = subprocess.run(
-            [str(venv_python), "-m", "pip", "install", "-q", "-r", str(requirements)],
-            capture_output=True,
-            encoding="utf-8", errors="replace",
-            timeout=DEFAULT_TIMEOUT,
-        )
-    if result.returncode != 0:
-        return False, (result.stderr or result.stdout).strip()
-    return True, None
+        argv = [str(venv_python), "-m", "pip", "install", "-q", "-r", str(requirements)]
+    return _run(argv, timeout=DEFAULT_TIMEOUT)
 
 
 def _import_modules(venv_python: Path, project_dir: Path) -> tuple[bool, str | None]:
@@ -93,17 +83,12 @@ def _import_modules(venv_python: Path, project_dir: Path) -> tuple[bool, str | N
     if not modules:
         return True, None
     script = "; ".join(f"import {m}" for m in modules)
-    result = subprocess.run(
+    return _run(
         [str(venv_python), "-c", script],
-        capture_output=True,
-        encoding="utf-8", errors="replace",
         timeout=60,
         cwd=str(project_dir),
         env={**os.environ, "MOCK_MODE": "1", "PYTHONIOENCODING": "utf-8"},
     )
-    if result.returncode != 0:
-        return False, (result.stderr or result.stdout).strip()
-    return True, None
 
 
 def run_env_tier(

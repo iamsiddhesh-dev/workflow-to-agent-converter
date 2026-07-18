@@ -14,7 +14,7 @@
 {%- endmacro %}
 
 {% macro task_kwargs(t) %}
-    description={{ t.description | pyrepr }},
+    description={{ (t.description ~ ("\n\nActual input for this run:\n{input}" if t.is_root else "")) | pyrepr }},
     expected_output={{ t.expected_output | pyrepr }},
     agent={{ t.agent_var }},
 {% if t.depends_on_vars %}
