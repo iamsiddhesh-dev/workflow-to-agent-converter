@@ -36,12 +36,15 @@ _BUILTIN_IMPORTS: dict[str, tuple[str, ...]] = {
 }
 
 _BUILTIN_KEYWORDS: dict[str, set[str]] = {
-    "read_file": {"read", "file", "open", "load", "contents"},
-    "write_file": {"write", "file", "save", "store"},
-    "http_get": {"http", "get", "fetch", "url", "request", "api", "download", "web"},
-    "parse_csv": {"csv", "parse", "spreadsheet", "rows", "table"},
-    "write_markdown_report": {"markdown", "report", "document", "format", "summary", "write"},
-    "send_message": {"send", "message", "notify", "notification", "ping", "channel", "alert", "post"},
+    "read_file": {"read", "file", "open", "load", "contents", "retrieve", "grab"},
+    "write_file": {"write", "file", "save", "store", "persist", "record"},
+    "http_get": {"http", "get", "fetch", "url", "request", "api", "download", "web", "endpoint", "call"},
+    "parse_csv": {"csv", "parse", "spreadsheet", "rows", "table", "excel", "columns", "sheet"},
+    "write_markdown_report": {"markdown", "report", "document", "format", "summary", "write", "compile", "writeup", "doc"},
+    "send_message": {
+        "send", "message", "notify", "notification", "ping", "channel", "alert", "post",
+        "slack", "email", "chat", "note", "broadcast", "tell", "inform", "page",
+    },
 }
 
 MIN_KEYWORD_HITS = 2

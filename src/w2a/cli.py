@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from w2a.logging_config import setup_logging
 from w2a.pipeline.graph import run_pipeline
-from w2a.spec.ambiguity import format_questions, score
+from w2a.spec.ambiguity import format_questions, resolve_ambiguities, score
 from w2a.spec.model import WorkflowSpec, human_summary
 from w2a.spec.translate import translate
 from w2a.validate.repair import run_validation
@@ -40,11 +40,10 @@ def convert(
         typer.echo("This description is ambiguous. Open questions:")
         typer.echo(format_questions(report))
         if interactive:
-            answers = []
-            for q, _ in sorted(report.scored, key=lambda qs: qs[1], reverse=True):
-                answers.append(f"Q: {q}\nA: {typer.prompt(q)}")
-            spec = translate(description, extra_context="\n".join(answers))
-            report = score(spec)
+            spec, report, _ = resolve_ambiguities(description, spec, report, ask=typer.prompt, translate_fn=translate)
+            if report.clarify:
+                typer.echo("\nStill some open questions after clarification; proceeding with recorded assumptions:")
+                typer.echo(format_questions(report))
         else:
             typer.echo("\nRe-run with --interactive to answer, or refine the description.")
             raise typer.Exit(code=2)

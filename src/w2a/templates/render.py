@@ -20,6 +20,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from w2a.spec.model import Pattern, TaskSpec, WorkflowSpec
+from w2a.spec.textutils import content_words_ordered as _content_words
 
 TEMPLATES_ROOT = Path(__file__).parent
 
@@ -38,12 +39,6 @@ _TEMPLATE_NAMES = {
     ".env.example": ".env.example.j2",
 }
 
-_STOPWORDS = {
-    "the", "and", "for", "with", "that", "this", "into", "from", "each", "any",
-    "per", "over", "them", "then", "when", "what", "which", "their", "your",
-    "task", "tool", "workflow", "agent", "create", "provide", "generate",
-}
-
 PATTERN_DIRS: dict[Pattern, str] = {
     "sequential": "sequential_pipeline",
     "router": "triage_router",
@@ -59,15 +54,6 @@ PATTERN_NOTES: dict[Pattern, str] = {
     "approval": "Any task marked as a human checkpoint in the spec pauses for terminal approval (CrewAI human_input=True) before the crew continues.",
     "watcher": "main.py polls in a loop, calling crew.run_once() every --interval seconds; pass --once to run a single pass (used for validation).",
 }
-
-
-def _content_words(text: str) -> list[str]:
-    """Lowercased alphabetic tokens of length >= 4, minus stopwords, de-duplicated in order."""
-    seen: list[str] = []
-    for w in re.findall(r"[a-z]{4,}", text.lower()):
-        if w not in _STOPWORDS and w not in seen:
-            seen.append(w)
-    return seen
 
 
 def _slugify(name: str) -> str:
@@ -107,6 +93,7 @@ def build_context(spec: WorkflowSpec, pattern: Pattern, resolutions: dict | None
     agent_var = {a.id: f"agent_{a.id}" for a in spec.agents}
     ordered_tasks = _topo_order(list(spec.tasks))
     depended_upon = {dep for t in spec.tasks for dep in t.depends_on}
+    edge_touched = {e for edge in spec.flow.edges for e in edge}
 
     agents = [
         {
@@ -132,6 +119,7 @@ def build_context(spec: WorkflowSpec, pattern: Pattern, resolutions: dict | None
             "human_checkpoint": t.human_checkpoint,
             "is_root": not t.depends_on,
             "is_leaf": t.id not in depended_upon,
+            "is_periodic": not (bool(t.depends_on) or t.id in depended_upon or t.id in edge_touched),
             "condition_keywords": _content_words(t.description + " " + t.expected_output)[:6],
         }
         for t in ordered_tasks
@@ -185,6 +173,7 @@ def build_context(spec: WorkflowSpec, pattern: Pattern, resolutions: dict | None
         "pattern_notes": PATTERN_NOTES[pattern],
         "agents": agents,
         "tasks": tasks,
+        "has_human_checkpoint": any(t.human_checkpoint for t in spec.tasks),
         "tools": tools,
         "tool_imports": sorted(tool_imports),
         "tool_objects": tool_objects,

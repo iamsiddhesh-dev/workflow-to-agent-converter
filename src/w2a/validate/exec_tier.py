@@ -72,6 +72,30 @@ def _build_argv(pattern: str) -> list[str]:
     return argv
 
 
+def _run_main(
+    project_dir: Path,
+    python_executable: str,
+    argv_tail: list[str],
+    timeout: float,
+    stdin_payload: str,
+) -> subprocess.CompletedProcess | None:
+    """Run main.py once; returns None on timeout (caller decides how to report it)."""
+    argv = [python_executable, "main.py", *argv_tail]
+    try:
+        return subprocess.run(
+            argv,
+            input=stdin_payload,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            cwd=str(project_dir),
+            env={**os.environ, "MOCK_MODE": "1", "PYTHONIOENCODING": "utf-8"},
+        )
+    except subprocess.TimeoutExpired:
+        return None
+
+
 def run_exec_tier(
     project_dir: Path,
     python_executable: str | None = None,
@@ -92,20 +116,9 @@ def run_exec_tier(
     slug = manifest["workflow"]["slug"]
 
     python_executable = python_executable or sys.executable
-    argv = [python_executable, "main.py", *_build_argv(pattern)]
 
-    try:
-        result = subprocess.run(
-            argv,
-            input=stdin_payload,
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            cwd=str(project_dir),
-            env={**os.environ, "MOCK_MODE": "1", "PYTHONIOENCODING": "utf-8"},
-        )
-    except subprocess.TimeoutExpired:
+    result = _run_main(project_dir, python_executable, _build_argv(pattern), timeout, stdin_payload)
+    if result is None:
         return ExecTierReport(
             ok=False, exit_code=None, tasks_expected=task_ids, tasks_started=[], tasks_missing=task_ids,
             artifact_ok=False, artifact_note="run timed out before completion",
@@ -114,12 +127,27 @@ def run_exec_tier(
 
     stdout = result.stdout or ""
     started = set(_TASK_START_RE.findall(stdout))
+    returncodes = [result.returncode]
+    stderr_tail = (result.stderr or "").strip()[-2000:]
+
+    # scheduled_watcher deliberately splits per-poll ("watch") tasks from tasks on
+    # their own cadence ("periodic" — disconnected from the poll trigger, e.g. a
+    # weekly report). A plain --once pass only ever exercises the watch chain, so
+    # a periodic-tasks project needs a second --periodic pass to reach the rest.
+    if pattern == "watcher":
+        periodic_result = _run_main(project_dir, python_executable, ["-", "--periodic"], timeout, stdin_payload)
+        if periodic_result is not None:
+            started |= set(_TASK_START_RE.findall(periodic_result.stdout or ""))
+            returncodes.append(periodic_result.returncode)
+            if periodic_result.returncode != 0:
+                stderr_tail += "\n[--periodic] " + (periodic_result.stderr or "").strip()[-2000:]
+
     missing = [t for t in task_ids if t not in started]
 
     issues: list[str] = []
-    if result.returncode != 0:
-        issues.append(f"main.py exited {result.returncode}")
-        issues.append((result.stderr or "").strip()[-2000:])
+    if any(rc != 0 for rc in returncodes):
+        issues.append(f"main.py exited {[rc for rc in returncodes if rc != 0]}")
+        issues.append(stderr_tail)
     if missing:
         issues.append(f"tasks never reached execution: {missing}")
 
@@ -134,7 +162,7 @@ def run_exec_tier(
             "even on a healthy project; only exit code and task coverage are asserted"
         )
 
-    ok = result.returncode == 0 and not missing and artifact_ok
+    ok = all(rc == 0 for rc in returncodes) and not missing and artifact_ok
     return ExecTierReport(
         ok=ok,
         exit_code=result.returncode,

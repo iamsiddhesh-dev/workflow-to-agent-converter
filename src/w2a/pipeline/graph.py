@@ -85,6 +85,9 @@ def build_graph(llm: LLM | None = None):
         spec = state["spec"]
         resolutions = resolve_all(spec)
         skeleton = render_pattern(spec, state["selection"].pattern, resolutions)
+        empty = [name for name, content in skeleton.items() if not content.strip()]
+        if empty:
+            raise ValueError(f"template render produced empty content for: {empty}")
         return {"resolutions": resolutions, "skeleton": skeleton, "files": skeleton}
 
     def gap_fill_node(state: PipelineState) -> dict:

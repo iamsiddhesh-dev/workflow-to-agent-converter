@@ -96,6 +96,31 @@ def test_repair_loop_fixes_syntax_error(tmp_path):
     assert saved["verdict"] == "pass_with_repairs"
 
 
+# --- Phase 7.4: repair-loop audit — a patch that sneaks in a hallucinated
+# import must be rejected, not accepted as a "fix" ---------------------------
+
+
+def test_repair_loop_rejects_sneaked_import(tmp_path):
+    """``_repair_file_with_llm`` (shared by the static- and exec-tier repair
+    paths) runs the same AST import-diff gate as gap-fill. A patch that fixes
+    the reported syntax error but also sneaks in a new import must be rejected
+    outright — not applied, not silently accepted as a passing repair."""
+    project = _generate(REPORT_SPEC, tmp_path)
+    original = (project / "crew.py").read_text(encoding="utf-8")
+    (project / "crew.py").write_text(original + "\ndef broken(:\n    pass\n", encoding="utf-8")
+
+    sneaky_patch = "import os_command_runner_totally_not_stdlib\n\n" + original
+    llm = PatchLLM(sneaky_patch)
+    spec = REPORT_SPEC.model_copy(deep=True)
+    report = run_validation(project, spec, llm=llm, max_iterations=3)
+
+    assert report.verdict == "fail"
+    static_repairs = [r for r in report.repairs if r.tier == "static"]
+    assert static_repairs and not static_repairs[0].applied
+    assert "disallowed imports" in static_repairs[0].reason
+    assert "os_command_runner_totally_not_stdlib" not in (project / "crew.py").read_text(encoding="utf-8")
+
+
 # --- Env tier: seeded missing dependency ------------------------------------
 #
 # crewai's own transitive dependency tree already carries requests (via
@@ -131,6 +156,31 @@ def test_repair_loop_fixes_missing_dependency(tmp_path):
     env_repair = next(r for r in report.repairs if r.tier == "env")
     assert env_repair.applied
     assert "crewai" in (project / "requirements.txt").read_text(encoding="utf-8")
+
+
+# --- Phase 7.1 #8: a subprocess timeout must be a clean report, not a bare traceback ---
+
+
+def test_env_tier_timeout_is_a_clean_report_not_a_traceback(tmp_path, monkeypatch):
+    """Simulates the exact Phase 6 finding: under load, a subprocess call inside
+    the env tier can blow its own timeout. That must surface as ``EnvTierReport(ok=False)``
+    with a message — never let ``subprocess.TimeoutExpired`` propagate out of the tier."""
+    import subprocess
+
+    from w2a.validate import env_tier as env_tier_module
+
+    project = _generate(REPORT_SPEC, tmp_path)
+
+    def _always_times_out(argv, **kw):
+        raise subprocess.TimeoutExpired(cmd=argv, timeout=kw.get("timeout", 1))
+
+    monkeypatch.setattr(env_tier_module.subprocess, "run", _always_times_out)
+
+    report = run_env_tier(project)  # must not raise
+
+    assert report.ok is False
+    assert not report.venv_created
+    assert any("timed out" in issue for issue in report.issues)
 
 
 # --- Exec tier: seeded runtime crash -----------------------------------------
@@ -173,6 +223,59 @@ def test_repair_loop_fixes_runtime_crash(tmp_path):
     assert exec_repair.applied
     assert exec_repair.target_file == "main.py"
     assert main_py.read_text(encoding="utf-8") == original
+
+
+# --- Phase 7.1 #3: exec tier must still prove periodic tasks execute ---------
+
+
+def _watcher_spec_with_periodic_task() -> WorkflowSpec:
+    """Mirrors the real ticket_triage.json fixture: a classify->alert watch chain
+    plus a weekly report task with no deps/edges — a genuinely different cadence,
+    which scheduled_watcher now runs only behind --periodic, not every poll."""
+    from w2a.spec.model import AgentSpec, Flow, TaskSpec, Workflow
+
+    return WorkflowSpec(
+        workflow=Workflow(
+            name="Ticket Watch", description="Watch tickets; separately, summarize the week.",
+            trigger="Polls for new tickets on a recurring schedule.", category="ops",
+        ),
+        agents=[
+            AgentSpec(id="classifier", role="Classifier", goal="classify", backstory_hint="fast"),
+            AgentSpec(id="alerter", role="Alerter", goal="alert", backstory_hint="vigilant"),
+            AgentSpec(id="reporter", role="Reporter", goal="report", backstory_hint="thorough"),
+        ],
+        tasks=[
+            TaskSpec(id="classify_ticket", description="Classify the ticket.", agent_id="classifier", expected_output="a label"),
+            TaskSpec(
+                id="trigger_alert", description="Alert on-call if urgent.", agent_id="alerter",
+                depends_on=["classify_ticket"], expected_output="alert sent or not",
+            ),
+            TaskSpec(
+                id="generate_weekly_report", description="Summarize the week's tickets.",
+                agent_id="reporter", expected_output="a weekly summary",
+            ),
+        ],
+        tools=[],
+        flow=Flow(pattern="watcher", edges=[("classify_ticket", "trigger_alert")]),
+    )
+
+
+def test_exec_tier_reaches_periodic_tasks_via_second_pass(tmp_path):
+    """A plain --once pass only exercises the watch chain (classify/alert); the
+    periodic task (weekly report) must still be proven reachable — via --periodic —
+    or the exec tier would regress to accepting a project where it silently never
+    runs at all, the opposite failure mode from Phase 6 finding #3 (it used to run
+    on *every* poll; now it must run on *at least one* explicit invocation)."""
+    spec = _watcher_spec_with_periodic_task()
+    project = _generate(spec, tmp_path)
+
+    report = run_exec_tier(project)
+
+    assert report.ok
+    assert "generate_weekly_report" in report.tasks_started
+    assert "classify_ticket" in report.tasks_started
+    assert "trigger_alert" in report.tasks_started
+    assert not report.tasks_missing
 
 
 # --- Specificity tier: seeded generic scaffolding ---------------------------
