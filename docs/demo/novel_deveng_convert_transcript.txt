@@ -1,0 +1,44 @@
+2026-07-18 21:35:26 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-07-18 21:35:30 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent "HTTP/1.1 200 OK"
+# CI Build Failure Analysis  [dev]
+Analyze failed CI builds to distinguish between flaky tests and real regressions, notifying teams of regressions and reporting weekly statistics.
+Trigger: A CI build fails.
+Pattern: router
+
+Agents:
+  - analyzer (Failure Analyzer): Examine failed tests and determine if they are flaky or a real regression.
+  - notifier (Incident Responder): Notify the appropriate team when a real regression is identified.
+  - reporter (Metrics Analyst): Generate a weekly summary of failure trends.
+
+Tasks:
+  - analyze_failure @analyzer: Analyze which tests failed and compare them against historical data to classify them as 'flaky' or 'real regression'.
+      -> A classification label for the failure (flaky or real) and the owning team identifier.
+  - handle_regression @notifier <- analyze_failure: If analyze_failure indicates a real regression, ping the owning team responsible for the failing test file.
+      -> Notification ping sent to the relevant team.
+  - handle_flaky @notifier <- analyze_failure: If analyze_failure indicates a flaky test, label it as 'flaky, safe to retry'.
+      -> Label applied to the CI build failure.
+  - generate_weekly_digest @reporter: Compile a weekly report summarizing the ratio of flaky vs real build failures.
+      -> A weekly statistical report on build failure trends.
+
+Tools:
+  - Test History Database [external]: Check if failing tests have a history of flakiness.
+  - Team Notifier [external]: Ping the owning team when a real regression is found.
+
+Assumptions:
+  - The weekly report is generated on a separate, time-based schedule independent of individual build triggers.
+  - The 'owning team' is identifiable via test file metadata.
+  - The 'rough history' of flaky tests is accessible via the history database tool.
+
+Open questions:
+  - The text implies 'real regressions' need a human, but also states they should ping the owning team; I have modeled the notification as an automated alert, but does a human need to confirm the notification or the regression categorization?
+2026-07-18 21:35:30 INFO w2a.templates.selector: selector: deterministic router (confidence=1.00)
+2026-07-18 21:35:30 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-07-18 21:35:32 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent "HTTP/1.1 200 OK"
+warning: lint: [warning:orphan_task] Task 'generate_weekly_digest' is disconnected from the flow (no deps, edges, or dependents).
+
+Pattern: router (deterministic, confidence 1.00) — declared flow.pattern matches the task graph shape
+tool history_db: MOCK_MODE stub (external system — kept as a stub until real credentials/wiring exist)
+tool messaging_system: MOCK_MODE stub (external system — kept as a stub until real credentials/wiring exist)
+
+Project written to generated\ci_build_failure_analysis (7 file(s))
+Run it: cd generated\ci_build_failure_analysis && pip install -r requirements.txt && MOCK_MODE=1 python main.py

@@ -1,0 +1,9 @@
+verdict: pass
+
+tiers:
+  [ok] static
+  [ok] env
+  [ok] exec
+  [ok] specificity
+
+Full report: generated\ci_build_failure_analysis\validation_report.json

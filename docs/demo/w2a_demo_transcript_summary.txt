@@ -1,0 +1,52 @@
+=== ticket triage (ops) ===
+
+-- convert --
+warning: lint: [warning:orphan_task] Task 'generate_weekly_summary' is disconnected from the flow (no deps, edges, or dependents).
+warning: gap_fill: rejected 2 fill(s), see manifest
+generated -> generated\support_ticket_triage_and_analytics
+-- validate --
+verdict: pass
+  [ok] static
+  [ok] env
+  [ok] exec
+  [ok] specificity
+-- real run --
+input: ticket_01.txt
+--- RESULT ---
+The critical issue reported by dana@northwind-retail.com regarding the checkout flow failure and login issues has been processed. Due to a system-level limitation with the messaging_service, the alert could not be transmitted electronically; however, a formal incident report has been successfully generated and saved to "incident_reports/critical_checkout_failure.md" to ensure the on-call team has the necessary documentation to address the active financial loss immediately.
+"incident_reports/critical_checkout_failure.md" to ensure the on-call      │
+│  team has the necessary documentation to address the active financial loss  │
+│  immediately.                                                               │
+│                                                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+input: ticket_02.txt
+--- RESULT ---
+# Billing Dispute: Invoice #4821
+
+input: ticket_03.txt
+--- RESULT ---
+The ticket has been successfully filed in the General Support queue.
+
+input: ticket_04.txt
+--- RESULT ---
+# Technical Support Queue
+
+input: ticket_05.txt
+
+=== PR summary (dev/eng) ===
+
+-- convert --
+warning: select_pattern: LLM fallback failed (Structured output failed after 3 attempts: 1 validation error for _PatternChoice
+generated -> generated\pr_summary_generator
+-- validate --
+verdict: pass
+  [ok] static
+  [ok] env
+  [ok] exec
+  [ok] specificity
+-- real run --
+input: pr_5928.diff
+--- RESULT ---
+### PR Summary: Robust Teardown Execution

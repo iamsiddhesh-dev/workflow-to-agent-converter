@@ -1,0 +1,8 @@
+Subject: Does the API support pagination?
+
+From: dev@tinylantern.app
+
+Quick question — we're pulling records from the /v1/orders endpoint and getting
+capped at 100 results with no obvious cursor param in the docs. Is there a
+pagination mechanism we're missing, or is 100 a hard limit? Not blocking, just
+planning our integration.

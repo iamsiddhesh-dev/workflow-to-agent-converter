@@ -1,4 +1,6 @@
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,6 +15,23 @@ from w2a.spec.translate import translate
 from w2a.validate.repair import run_validation
 
 app = typer.Typer(help="w2a — a LangGraph app that writes CrewAI apps.")
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+_DEMO_WORKFLOWS = [
+    {
+        "label": "ticket triage (ops)",
+        "description_path": _REPO_ROOT / "examples" / "workflows" / "ticket_triage.md",
+        "inputs": sorted((_REPO_ROOT / "examples" / "demo_inputs" / "ticket_triage").glob("*.txt")),
+        "run_args": ["--once"],
+    },
+    {
+        "label": "PR summary (dev/eng)",
+        "description_path": _REPO_ROOT / "examples" / "workflows" / "pr_summary.md",
+        "inputs": [_REPO_ROOT / "examples" / "demo_inputs" / "pr_summary" / "pr_5928.diff"],
+        "run_args": [],
+    },
+]
 
 
 def _read_source(source: str) -> str:
@@ -103,13 +122,70 @@ def validate(
 
 
 @app.command()
-def demo() -> None:
-    """Run the two real-mode Field Trial workflows start to finish."""
-    typer.echo("[stub] demo")
-    raise typer.Exit(code=0)
+def demo(
+    out: str = typer.Option("generated", "--out", help="Root directory for generated projects."),
+) -> None:
+    """Convert, validate, and really run the two Field Trial demo workflows end to end.
+
+    ticket_triage (ops) and pr_summary (dev/eng): translate -> generate ->
+    validate -> execute against committed sample inputs with a real LLM.
+    Requires GEMINI_API_KEY or GROQ_API_KEY.
+    """
+    any_failed = False
+    for workflow in _DEMO_WORKFLOWS:
+        typer.echo(f"\n=== {workflow['label']} ===")
+        description = workflow["description_path"].read_text(encoding="utf-8")
+
+        typer.echo("-- convert --")
+        state = run_pipeline(source=description, out_root=out)
+        for warning in state.get("warnings", []):
+            typer.echo(f"warning: {warning}")
+        if state["errors"]:
+            typer.echo("pipeline errors:")
+            for error in state["errors"]:
+                typer.echo(f"  {error}")
+            any_failed = True
+            continue
+
+        result = state["write_result"]
+        project_dir = result.project_dir
+        typer.echo(f"generated -> {project_dir}")
+
+        typer.echo("-- validate --")
+        spec = state["spec"]
+        report = run_validation(project_dir, spec, max_iterations=3)
+        typer.echo(str(report))
+        if report.verdict == "fail":
+            typer.echo("validation failed — skipping real-mode run.")
+            any_failed = True
+            continue
+
+        typer.echo("-- real run --")
+        env = os.environ.copy()
+        env.pop("MOCK_MODE", None)
+        for input_path in workflow["inputs"]:
+            typer.echo(f"input: {input_path.name}")
+            proc = subprocess.run(
+                [sys.executable, "main.py", str(input_path), *workflow["run_args"]],
+                cwd=project_dir,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            typer.echo(proc.stdout)
+            if proc.returncode != 0:
+                typer.echo(f"error: main.py exited {proc.returncode}")
+                typer.echo(proc.stderr)
+                any_failed = True
+
+    raise typer.Exit(code=1 if any_failed else 0)
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     load_dotenv()
     setup_logging()
     app()

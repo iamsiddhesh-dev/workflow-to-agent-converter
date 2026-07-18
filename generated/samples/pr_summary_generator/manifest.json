@@ -1,0 +1,150 @@
+{
+  "ambiguities": [
+    "How should the workflow handle PRs with merge conflicts or CI failures? Should it still comment?"
+  ],
+  "assumptions": [
+    "The system has programmatic access to read PR diffs and write comments.",
+    "The definition of 'trivial' (typo/comment) will be handled by the analyst agent's internal logic."
+  ],
+  "files": {
+    ".env.example": "0c2956e3a0027c1b80b1d17a35296aff3b738c5ba767a37764b00647180c8c3d",
+    "README.md": "a92e6b97afeb77f4905a176e9fe808f6c51aa052fe0de0ed2a8109e13b084545",
+    "config.py": "48921c079cfe2ada6d303d698b0bb08b7c0a704379827fe79b3ed88003d5bebb",
+    "crew.py": "99610c29c117ef35e2b52b94322f4e304b03ec5ff4c41972066e08c6d53698bf",
+    "main.py": "a569d175e129800df36f9916771b5e5ea1ffaf4a5d2cb360d699fdc7463867eb",
+    "requirements.txt": "5f4fe9bd7eae93646b977162f698f6348ec5fd3e9c9300b8a91ce87bc3e5ee2e",
+    "tools.py": "9fe78eec3c91a0e45a48e75429d7ba2f438a34fb81ac2086b15f75bbcb146560"
+  },
+  "gap_fill": {
+    "applied": {
+      "backstories": [
+        "diff_analyst",
+        "comment_generator"
+      ],
+      "task_bodies": [
+        "analyze_pr",
+        "write_pr_comment"
+      ],
+      "tool_docstrings": [
+        "git_diff_reader",
+        "pr_commenter"
+      ]
+    },
+    "error": null,
+    "llm_called": true,
+    "rejected": []
+  },
+  "generated_at": "2026-07-18T07:00:41.279429+00:00",
+  "generator": "w2a",
+  "llm_calls": [
+    "translate",
+    "select_pattern_fallback",
+    "gap_fill"
+  ],
+  "manifest_version": 1,
+  "pattern": {
+    "confidence": 1.0,
+    "reasoning": "The workflow consists of a single linear chain where 'analyze_pr' is followed by 'write_pr_comment'. There is no branching (router), no gathering from multiple independent sources (report), no human intervention (approval), and no periodic polling (watcher).",
+    "selected": "sequential",
+    "source": "llm_fallback"
+  },
+  "source_description": "Our PRs are getting big enough that reviewers don't actually read the whole diff, they just skim and approve, and stuff slips through. I want a summary generated for every PR that actually explains what changed and why it matters - not just \"updated files X, Y, Z\" but like, what's the actual behavior change, does it touch anything risky (migrations, auth, anything that hits prod config), and are there tests covering the change or not. Post it as a comment on the PR so reviewers have something real to start from instead of the raw diff. If the diff is small and obviously trivial (typo fix, comment change) it doesn't need the full treatment, just a one-liner is fine.\n",
+  "spec": {
+    "agents": [
+      {
+        "backstory_hint": "Expert engineer who prioritizes systemic risk and architectural integrity over surface-level code churn.",
+        "goal": "Determine the functional behavior change, identify risky areas, and verify test coverage in a PR.",
+        "id": "diff_analyst",
+        "role": "PR Analyst"
+      },
+      {
+        "backstory_hint": "Technical communicator who understands that PR reviewers need context, not just file lists.",
+        "goal": "Synthesize PR findings into a clear, actionable comment for reviewers.",
+        "id": "comment_generator",
+        "role": "Technical Writer"
+      }
+    ],
+    "ambiguities": [
+      "How should the workflow handle PRs with merge conflicts or CI failures? Should it still comment?"
+    ],
+    "assumptions": [
+      "The system has programmatic access to read PR diffs and write comments.",
+      "The definition of 'trivial' (typo/comment) will be handled by the analyst agent's internal logic."
+    ],
+    "flow": {
+      "edges": [
+        [
+          "analyze_pr",
+          "write_pr_comment"
+        ]
+      ],
+      "pattern": "report"
+    },
+    "tasks": [
+      {
+        "agent_id": "diff_analyst",
+        "depends_on": [],
+        "description": "Examine the pull request diff to classify it as trivial or substantive. If substantive, extract behavior changes, identify risks (migrations, auth, config), and confirm test coverage.",
+        "expected_output": "A technical assessment indicating if the PR is trivial or substantive, including details on behavior changes, identified risks, and test coverage status.",
+        "human_checkpoint": false,
+        "id": "analyze_pr"
+      },
+      {
+        "agent_id": "comment_generator",
+        "depends_on": [
+          "analyze_pr"
+        ],
+        "description": "Based on the analyst's assessment, draft either a one-line summary (for trivial PRs) or a detailed summary covering changes, risks, and test coverage (for substantive PRs), then post it to the PR.",
+        "expected_output": "A PR comment containing either a concise one-liner or a structured summary of the PR's impact.",
+        "human_checkpoint": false,
+        "id": "write_pr_comment"
+      }
+    ],
+    "tools": [
+      {
+        "category": "external",
+        "id": "git_diff_reader",
+        "inputs": "pull request identifier",
+        "name": "Git Diff Reader",
+        "outputs": "raw diff text",
+        "purpose": "Retrieve the raw code changes from the pull request."
+      },
+      {
+        "category": "external",
+        "id": "pr_commenter",
+        "inputs": "pull request identifier, comment text",
+        "name": "PR Commenter",
+        "outputs": "confirmation of post",
+        "purpose": "Publish the generated analysis as a comment on the PR thread."
+      }
+    ],
+    "workflow": {
+      "category": "dev",
+      "description": "Generate a high-quality summary for pull requests to improve review quality, distinguishing between substantive changes and trivial fixes.",
+      "name": "PR Summary Generator",
+      "trigger": "A new pull request is opened or updated."
+    }
+  },
+  "tools": [
+    {
+      "category": "external",
+      "name": "Git Diff Reader",
+      "reason": "external system \u2014 kept as a stub until real credentials/wiring exist",
+      "resolution": "stub",
+      "tool_id": "git_diff_reader"
+    },
+    {
+      "category": "external",
+      "name": "PR Commenter",
+      "reason": "external system \u2014 kept as a stub until real credentials/wiring exist",
+      "resolution": "stub",
+      "tool_id": "pr_commenter"
+    }
+  ],
+  "workflow": {
+    "category": "dev",
+    "name": "PR Summary Generator",
+    "pattern_declared": "report",
+    "slug": "pr_summary_generator"
+  }
+}

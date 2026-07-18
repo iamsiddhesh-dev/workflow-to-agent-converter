@@ -1,0 +1,8 @@
+Subject: URGENT - data missing after sync
+
+From: ops@harborline-freight.com
+
+We ran our nightly sync at 2am and about 400 shipment records just aren't showing
+up anymore in the dashboard. This looks like actual data loss, not a display bug —
+we checked the export and they're gone there too. We need this looked at right
+now, this is affecting live freight tracking for customers.

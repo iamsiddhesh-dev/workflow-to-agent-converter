@@ -1,0 +1,48 @@
+2026-07-18 21:25:23 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-07-18 21:25:27 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent "HTTP/1.1 200 OK"
+This description is ambiguous. Open questions:
+  1. How does the system determine who the relevant manager is for a specific report?
+  2. Should 'kicked back' reports be included in the monthly rollup as a separate status?
+How does the system determine who the relevant manager is for a specific report?: Should 'kicked back' reports be included in the monthly rollup as a separate status?: 2026-07-18 21:25:27 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-07-18 21:25:33 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent "HTTP/1.1 200 OK"
+# Expense Report Processing  [ops]
+Process expense reports by verifying receipts and thresholds, routing high-value reports for approval, and generating monthly finance summaries.
+Trigger: An expense report is submitted.
+Pattern: router
+
+Agents:
+  - validator (Expense Validator): Verify receipt inclusion and determine if a report is valid, requires approval, or needs to be kicked back.
+  - finance_processor (Finance Processor): Log approved expenses for reimbursement and generate the monthly department-level report.
+  - manager (Department Manager): Approve or reject expense reports exceeding the $500 threshold.
+
+Tasks:
+  - validate_report @validator: Examine the expense report for a valid receipt. If missing, flag as 'kicked back'. If present, determine if it is under $500 (auto-reimburse) or over $500 (needs manager approval).
+      -> Status of the report (auto-approved, pending_manager_approval, or kicked_back).
+  - kickback_report @validator <- validate_report: Notify the submitter that their report is missing a receipt and has been kicked back for revision.
+      -> A notification sent to the submitter.
+  - approve_report @manager <- validate_report [human checkpoint]: Review and approve/deny expense reports exceeding $500.
+      -> Approval or rejection decision for the expense report.
+  - log_reimbursement @finance_processor <- validate_report, approve_report: Log the expense for final reimbursement once it is either auto-approved or manager-approved.
+      -> Logged expense transaction.
+  - generate_monthly_report @finance_processor: Create a monthly rollup of approved expenses, kicked-back reports, and total spend by department.
+      -> Monthly finance summary document.
+
+Tools:
+  - notification service [builtin]: Send messages to submitters when reports are kicked back.
+  - ledger system [external]: Log approved expenses and retrieve data for the monthly rollup.
+
+Assumptions:
+  - Manager identification for approval is handled via the organizational hierarchy metadata associated with the submitter.
+  - The monthly report includes 'kicked back' status as a separate category of activity.
+  - The finance processor runs the monthly rollup as an independent task from individual expense processing.
+2026-07-18 21:25:33 INFO w2a.templates.selector: selector: deterministic router (confidence=1.00)
+2026-07-18 21:25:33 INFO google_genai.models: AFC is enabled with max remote calls: 10.
+2026-07-18 21:25:36 INFO httpx: HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent "HTTP/1.1 200 OK"
+warning: lint: [warning:orphan_task] Task 'generate_monthly_report' is disconnected from the flow (no deps, edges, or dependents).
+
+Pattern: router (deterministic, confidence 1.00) — declared flow.pattern matches the task graph shape
+tool notification_service: resolved to builtin send_message
+tool ledger_system: MOCK_MODE stub (external system — kept as a stub until real credentials/wiring exist)
+
+Project written to generated\expense_report_processing (7 file(s))
+Run it: cd generated\expense_report_processing && pip install -r requirements.txt && MOCK_MODE=1 python main.py

@@ -1,0 +1,9 @@
+Subject: Export button throws a 500
+
+From: priya@fernandes-consulting.com
+
+When I click "Export to CSV" on the reports page I get a blank error toast and the
+network tab shows a 500 from /api/reports/export. Happens every time, on both
+Chrome and Firefox. Not affecting anything else, and I can work around it by
+copy-pasting the table for now, so no rush — but wanted to flag it since it's
+consistent.
