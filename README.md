@@ -80,7 +80,6 @@ This project validates by actually executing generated code, not by eyeballing t
 
 - [DECISIONS.md](DECISIONS.md) — the four load-bearing ideas: the deterministic-template/LLM-gap-fill boundary, the closed tool registry, the bounded repair loop, and the specificity check.
 - [RESULTS.md](RESULTS.md) — the full generalization matrix across all 6 benchmark workflows, before/after Phase 7 hardening numbers, and an honest failure gallery.
-- [PLAN.md](PLAN.md) / [DETAILED_PLAN.md](DETAILED_PLAN.md) — the phase-by-phase roadmap this was built against.
 
 ## Tests
 

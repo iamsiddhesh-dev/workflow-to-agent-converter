@@ -26,3 +26,7 @@ logs/
 # personal phase notes — local learning journal, not part of the repo deliverable
 phase-*-notes.md
 
+# internal planning docs — local reference only, not part of the public repo
+PLAN.md
+DETAILED_PLAN.md
+
