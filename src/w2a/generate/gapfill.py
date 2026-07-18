@@ -100,7 +100,7 @@ def _domain_nouns(spec: WorkflowSpec) -> list[str]:
     return _content_words(corpus)[:20]
 
 
-def _build_prompt(spec: WorkflowSpec, stub_tool_ids: list[str]) -> str:
+def _build_prompt(spec: WorkflowSpec, stub_tool_ids: list[str], retry_hint: str = "") -> str:
     agent_ids = ", ".join(a.id for a in spec.agents)
     task_ids = ", ".join(t.id for t in spec.tasks)
     tool_line = (
@@ -124,6 +124,7 @@ def _build_prompt(spec: WorkflowSpec, stub_tool_ids: list[str]) -> str:
         f"{tool_line}\n"
         "Rules: plain prose only. No code, no imports, no markdown fences, and no tool, "
         "system, or agent names beyond those in the spec. Return ONLY the JSON object."
+        + (f"\n\n{retry_hint}" if retry_hint else "")
     )
 
 
@@ -158,11 +159,14 @@ def gap_fill(
     pattern: Pattern,
     resolutions: dict | None = None,
     llm: LLM | None = None,
+    retry_hint: str = "",
 ) -> tuple[dict[str, str], GapFillReport]:
     """Render the skeleton, ask the LLM for fills, and re-render behind the AST gate.
 
     Always returns a usable file set: on any LLM failure the untouched skeleton
-    comes back with the failure recorded in the report.
+    comes back with the failure recorded in the report. ``retry_hint`` lets a
+    caller (the specificity repair strategy) ask for a second, better-grounded
+    pass without changing the gap kinds or the AST gate.
     """
     context = build_context(spec, pattern, resolutions)
     skeleton = render_files(context, pattern)
@@ -171,7 +175,7 @@ def gap_fill(
     stub_tool_ids = [t["id"] for t in context["tools"] if not t["resolved"]]
     try:
         llm = llm or LLM()
-        fills = llm.call(_build_prompt(spec, stub_tool_ids), response_model=GapFills)
+        fills = llm.call(_build_prompt(spec, stub_tool_ids, retry_hint), response_model=GapFills)
         report.llm_called = True
     except LLMError as exc:
         report.error = str(exc)

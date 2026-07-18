@@ -3,14 +3,15 @@
 
 The task(s) marked as a human checkpoint in the spec get `human_input=True`
 below — CrewAI pauses that task for terminal approval before the crew moves
-on to whatever depends on it.
+on to whatever depends on it. In MOCK_MODE the checkpoint is skipped instead
+of prompting, so offline validation runs never block on stdin.
 """
 
 from __future__ import annotations
 
 from crewai import Agent, Crew, Process, Task
 
-from config import build_llm
+from config import MOCK_MODE, build_llm
 {% if tools %}
 from tools import ALL_TOOLS
 {% endif %}
