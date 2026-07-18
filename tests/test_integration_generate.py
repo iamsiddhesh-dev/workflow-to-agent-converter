@@ -5,10 +5,8 @@ and assert each import resolves to registry + stdlib + pinned deps + the
 project's own modules — nothing else, ever.
 """
 
-import ast
 import json
 import os
-import sys
 from pathlib import Path
 
 import pytest
@@ -18,24 +16,12 @@ from tests.golden_specs import REPORT_SPEC, ROUTER_SPEC
 from w2a.cli import app
 from w2a.generate.gapfill import GapFills
 from w2a.pipeline.graph import run_pipeline
-
-ALLOWED_THIRD_PARTY = {"crewai", "requests", "dotenv"}
-PROJECT_LOCAL = {"config", "crew", "tools", "main"}
+from w2a.validate.static_tier import import_allowlist_issues
 
 
 def assert_imports_allowed(project_dir: Path) -> None:
-    allowed = set(sys.stdlib_module_names) | ALLOWED_THIRD_PARTY | PROJECT_LOCAL
-    for py_file in project_dir.glob("*.py"):
-        tree = ast.parse(py_file.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                tops = {alias.name.split(".")[0] for alias in node.names}
-            elif isinstance(node, ast.ImportFrom):
-                tops = {(node.module or "").split(".")[0]}
-            else:
-                continue
-            outside = tops - allowed
-            assert not outside, f"{py_file.name} imports outside the allowlist: {sorted(outside)}"
+    issues = import_allowlist_issues(project_dir)
+    assert not issues, "\n".join(issues)
 
 
 class FakeLLM:

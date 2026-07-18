@@ -21,6 +21,6 @@
     context=[{{ t.depends_on_vars | join(', ') }}],
 {% endif %}
 {% if t.human_checkpoint %}
-    human_input=True,
+    human_input=not MOCK_MODE,
 {% endif %}
 {%- endmacro %}
