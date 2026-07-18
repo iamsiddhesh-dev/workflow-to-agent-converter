@@ -1,0 +1,9 @@
+verdict: pass
+
+tiers:
+  [ok] static
+  [ok] env
+  [ok] exec
+  [ok] specificity
+
+Full report: generated\expense_report_processing\validation_report.json

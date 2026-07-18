@@ -1,0 +1,8 @@
+Subject: Can't log in, losing money right now
+
+From: dana@northwind-retail.com
+
+Hey, our whole checkout flow is down. Customers are hitting "can't login" errors on
+the storefront since about 20 minutes ago and we're a live sale right now. This is
+costing us real money every minute. Please escalate this immediately, it's not just
+me, our support inbox is flooding with the same complaint.

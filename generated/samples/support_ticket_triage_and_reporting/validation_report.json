@@ -1,0 +1,26 @@
+{
+  "repairs": [],
+  "tiers": [
+    {
+      "detail": "static tier: pass\n  [ok] py_compile\n  [ok] ruff\n  [ok] import_allowlist",
+      "ok": true,
+      "tier": "static"
+    },
+    {
+      "detail": "env tier: pass",
+      "ok": true,
+      "tier": "env"
+    },
+    {
+      "detail": "exec tier: pass (exit=0)\n  tasks started: 3/3\n  artifact: ok \u2014 no artifact hard-checked for this pattern \u2014 MOCK_MODE's LLM doesn't support function-calling, so tool-produced artifacts (e.g. outbox/) aren't guaranteed even on a healthy project; only exit code and task coverage are asserted",
+      "ok": true,
+      "tier": "exec"
+    },
+    {
+      "detail": "specificity tier: pass (0.60 >= 0.6 required) \u2014 verdict: specific\n  missing concepts: ['while', 'checking', 'marked', 'aggregate', 'received', 'during', 'rapid', 'risk', 'detection', 'reliable', 'systems', 'ensures', 'incidents', 'missed', 'oriented', 'excels', 'distilling', 'large', 'volumes', 'actionable', 'insights', 'update', 'send', 'notifications']",
+      "ok": true,
+      "tier": "specificity"
+    }
+  ],
+  "verdict": "pass"
+}

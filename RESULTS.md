@@ -155,3 +155,43 @@ This is exactly the cross-cutting interaction Phase 7 exists to surface: a trans
 - **Diversity (7.4):** `src/w2a/validate/diversity.py` + `test_diversity.py` — AST-extracted prose (only Agent/Task prose kwargs, excluding identical scaffolding) compared between two projects via n-gram overlap; two different golden projects pass, seeded near-duplicate prose fails. A fleet-level check, deliberately not wired into per-project `run_validation`.
 - **Chaos (7.5):** `test_chaos.py` — LLM timeout at translate (→ clean parse error, nothing written), malformed output at translate (→ clean parse error) and at gap-fill (→ skeleton ships with warning), empty template render (→ new `render_node` guard raises a clean render error), and a resumable-checkpoint proof (a downstream failure doesn't force re-translation). All land as structured `PipelineError`s in state, never a traceback.
 - **Repair-loop audit (7.4):** both Phase-6 repairs re-reviewed — both were clean specificity retries, no hallucinated-import sneak-back (the AST import-diff gate in `gap_fill()` covers every repair path). Added `test_repair_loop_rejects_sneaked_import` as a standing guard on the static/exec repair path.
+
+---
+
+# Phase 8 — Showcase: generalization on never-before-seen input, and `w2a demo`
+
+## 8.A — Two brand-new workflows, never in the benchmark set
+
+The 6 examples in `examples/workflows/` are the frozen benchmark set the translator/selector were tuned against through Phases 6–7. To prove the pipeline generalizes rather than having quietly memorized those 6 shapes, two new descriptions — never seen by any prior phase — were run through `w2a convert --interactive` and `w2a validate` for real, on `gemini-flash-lite-latest`, with no code changes made in response to what came out.
+
+**Ops — expense report approval routing** (a $500 auto-approve/manager-approval/receipt-kickback flow, plus a monthly rollup):
+
+| | |
+|---|---|
+| Ambiguity gate | fired, 2 questions (manager lookup; whether kickbacks appear in the rollup) — answered via `--interactive` |
+| Declared → selected pattern | router → **router**, deterministic (confidence 1.00) |
+| Lint | 1 warning: `orphan_task` (`generate_monthly_report` — correctly disconnected, it's a periodic rollup, not part of the per-report flow) |
+| Tools | `notification_service` → resolved to builtin `send_message`; `ledger_system` → correctly stubbed (no real finance-system credentials exist) |
+| Validation | **pass**, 0 repairs, all 4 tiers green |
+
+**Dev/eng — CI flaky-test triage** (classify build failures as flaky vs. real regression, ping the owning team, weekly flake-rate digest):
+
+| | |
+|---|---|
+| Ambiguity gate | did not fire (0 ambiguities) — the description's own open question ("does a human need to confirm the regression call?") was correctly routed to `assumptions[]`/a noted open question rather than blocking |
+| Declared → selected pattern | router → **router**, deterministic (confidence 1.00) |
+| Lint | 1 warning: `orphan_task` (`generate_weekly_digest` — same shape as the ops case: a periodic report correctly left disconnected from the per-build flow) |
+| Tools | `history_db`, `messaging_system` → both correctly stubbed (no real CI-history DB or chat-ops integration exists) |
+| Validation | **pass**, 0 repairs, all 4 tiers green |
+
+**Reading the result honestly:** both new workflows landed exactly where the Phase 7 re-run matrix predicted a fresh input should — deterministic router selection (the fan-out worked example generalized past its one seed case), a correctly-disconnected periodic-report task flagged as a lint warning rather than silently mishandled, and tool resolution split cleanly between a real builtin match and honest stubs for systems that don't exist in the closed registry. Neither needed a repair pass. This is the generalization claim Phase 6–7 argued for, now checked against input the system had never influenced its own tuning with.
+
+## 8.B — `w2a demo`: the full loop, one command
+
+`w2a demo` (no arguments beyond an API key in `.env`) translates both Field Trial benchmark descriptions (`ticket_triage`, `pr_summary`) fresh, generates the projects, runs the full validate/repair loop, and then executes each project for real against the committed sample inputs in `examples/demo_inputs/` — end to end, one command, real LLM calls throughout. A representative run: both projects reached `verdict: pass` (0 repairs), all 5 ticket-triage sample tickets executed and produced a routing decision, and the PR-summary run reasoned over the real `pallets/flask#5928` diff bundled at `examples/demo_inputs/pr_summary/pr_5928.diff` (confirming the Phase 7 `{input}`-interpolation fix still holds under a fresh, from-scratch translation, not just the hand-patched Phase 6 projects).
+
+**One real bug this surfaced, fixed on the spot:** the first `w2a demo` run crashed capturing subprocess output. `subprocess.run(..., text=True)` decodes the child's stdout using the *parent* process's locale codepage — on Windows that's `cp1252`, not UTF-8 — so CrewAI's emoji-laden console output (🚀📋) threw `UnicodeDecodeError` inside the capture thread, and a second pass (after fixing that) still crashed on `typer.echo()` re-encoding the same text back out through the same `cp1252` console. Same root cause as the Phase-7-fixed "Windows charmap" bug (#9 in the closed queue above), one level up the process tree: generated `main.py` already reconfigures its own stdout to UTF-8, but the *w2a CLI itself* hadn't. Fixed by passing `encoding="utf-8", errors="replace"` to the `subprocess.run` call in `demo()` and adding the same `sys.stdout/stderr.reconfigure(encoding="utf-8", errors="replace")` guard to `w2a.cli.main()` that the generated projects already carry. A second and third full `w2a demo` run after the fix completed clean with readable output.
+
+## 8.C — Committed sample projects
+
+Two full generated projects are committed at `generated/samples/` (whitelisted in `.gitignore`, everything else under `generated/` stays ignored) — `support_ticket_triage_and_reporting` (ops) and `pr_summary_generator` (dev/eng) — each with its `manifest.json`, `validation_report.json`, and (for these two specifically) the real-mode `demo_output/` transcripts and honest grading notes from the original Phase 6 Field Trial, so the sample projects double as the receipts for the 6.2 real-mode claims above.

@@ -1,0 +1,166 @@
+{
+  "ambiguities": [
+    "Should the report be emailed, posted to Slack, or saved as a document in a specific system?"
+  ],
+  "assumptions": [
+    "The weekly report is generated on a set schedule at the end of the week.",
+    "Urgent criteria includes keywords like 'down', 'broken', 'can't login', or 'losing money'."
+  ],
+  "files": {
+    ".env.example": "0c2956e3a0027c1b80b1d17a35296aff3b738c5ba767a37764b00647180c8c3d",
+    "README.md": "b1d113fe7e33ac5da8935812d1b2778eef047f6a23ecc9af64b85cdc5233f9d9",
+    "config.py": "90d0136d92df368249377f66a19e97083d309cff2885e0b3bc24c26a6f4896a6",
+    "crew.py": "df68ff5c01f1c29f84d29d8421ccf29c2d9fb4596ba1aa3a5db76de2880e7dd2",
+    "main.py": "503a9d0321fd72380d6e6dbda9308673b983fb33d8eed05d37eba48d1e13065f",
+    "requirements.txt": "5f4fe9bd7eae93646b977162f698f6348ec5fd3e9c9300b8a91ce87bc3e5ee2e",
+    "tools.py": "7ba087198a75bbbd0c2e048d2bb4528cf889d9b6a221aed3b8f9e21ef030f5e9"
+  },
+  "gap_fill": {
+    "applied": {
+      "backstories": [
+        "triage_agent",
+        "alert_agent",
+        "reporter_agent"
+      ],
+      "task_bodies": [
+        "classify_ticket",
+        "trigger_alert",
+        "generate_weekly_report"
+      ],
+      "tool_docstrings": [
+        "zendesk_api",
+        "pagerduty_api"
+      ]
+    },
+    "error": null,
+    "llm_called": true,
+    "rejected": []
+  },
+  "generated_at": "2026-07-18T06:57:17.966369+00:00",
+  "generator": "w2a",
+  "llm_calls": [
+    "translate",
+    "select_pattern_fallback",
+    "gap_fill"
+  ],
+  "manifest_version": 1,
+  "pattern": {
+    "confidence": 1.0,
+    "reasoning": "The workflow processes tickets based on two distinct triggers: individual tickets trigger the triage and alert flow, while the report generation is explicitly defined to run on a set schedule at the end of the week, characterizing a watcher pattern.",
+    "selected": "watcher",
+    "source": "llm_fallback"
+  },
+  "source_description": "When support tickets come in someone needs to figure out if it's a bug or a billing thing or just a question, and urgent ones should ping whoever's on call right away. Right now Priya just eyeballs every ticket as it lands which doesn't scale. I want something that reads the ticket, decides which bucket it's in, and if it sounds urgent (customer says down/broken/can't login/losing money, stuff like that) it should notify on-call immediately. Everything else can just get labeled and sit in the queue for the right team to pick up during business hours. And we want a summary at the end of the week of what came in - how many bugs vs billing vs questions, anything that spiked, so I can see patterns without reading every single ticket myself.\n",
+  "spec": {
+    "agents": [
+      {
+        "backstory_hint": "Analytical support specialist with a focus on rapid classification and risk detection.",
+        "goal": "Read incoming tickets, label them by category, and detect urgent issues.",
+        "id": "triage_agent",
+        "role": "Ticket Classifier"
+      },
+      {
+        "backstory_hint": "Reliable systems monitor who ensures critical incidents are never missed.",
+        "goal": "Trigger immediate alerts for high-priority issues via PagerDuty.",
+        "id": "alert_agent",
+        "role": "On-Call Notifier"
+      },
+      {
+        "backstory_hint": "Data-oriented analyst who excels at distilling large volumes of tickets into actionable insights.",
+        "goal": "Compile a weekly summary of ticket trends and volume.",
+        "id": "reporter_agent",
+        "role": "Operations Analyst"
+      }
+    ],
+    "ambiguities": [
+      "Should the report be emailed, posted to Slack, or saved as a document in a specific system?"
+    ],
+    "assumptions": [
+      "The weekly report is generated on a set schedule at the end of the week.",
+      "Urgent criteria includes keywords like 'down', 'broken', 'can't login', or 'losing money'."
+    ],
+    "flow": {
+      "edges": [
+        [
+          "classify_ticket",
+          "trigger_alert"
+        ]
+      ],
+      "pattern": "router"
+    },
+    "tasks": [
+      {
+        "agent_id": "triage_agent",
+        "depends_on": [],
+        "description": "Read the Zendesk ticket content and categorize it as bug, billing, or question, while checking for urgency keywords.",
+        "expected_output": "Category label and an urgency status (boolean).",
+        "human_checkpoint": false,
+        "id": "classify_ticket"
+      },
+      {
+        "agent_id": "alert_agent",
+        "depends_on": [
+          "classify_ticket"
+        ],
+        "description": "If the ticket is marked as urgent, trigger an immediate notification via PagerDuty.",
+        "expected_output": "Confirmation of PagerDuty alert if triggered.",
+        "human_checkpoint": false,
+        "id": "trigger_alert"
+      },
+      {
+        "agent_id": "reporter_agent",
+        "depends_on": [],
+        "description": "Aggregate all tickets received during the week to produce a report on category volume and trends.",
+        "expected_output": "A weekly summary document showing counts of bugs, billing, and questions with noted spikes.",
+        "human_checkpoint": false,
+        "id": "generate_weekly_report"
+      }
+    ],
+    "tools": [
+      {
+        "category": "external",
+        "id": "zendesk_api",
+        "inputs": "ticket ID",
+        "name": "Zendesk Connector",
+        "outputs": "ticket content and current metadata",
+        "purpose": "Read ticket content and update ticket labels."
+      },
+      {
+        "category": "external",
+        "id": "pagerduty_api",
+        "inputs": "alert details",
+        "name": "PagerDuty Notifier",
+        "outputs": "API success confirmation",
+        "purpose": "Send urgent notifications to the on-call engineer."
+      }
+    ],
+    "workflow": {
+      "category": "ops",
+      "description": "Categorize incoming Zendesk support tickets, alert on-call staff for urgent issues, and generate a weekly analytical summary.",
+      "name": "Support Ticket Triage and Reporting",
+      "trigger": "A new ticket arrives in Zendesk."
+    }
+  },
+  "tools": [
+    {
+      "category": "external",
+      "name": "Zendesk Connector",
+      "reason": "external system \u2014 kept as a stub until real credentials/wiring exist",
+      "resolution": "stub",
+      "tool_id": "zendesk_api"
+    },
+    {
+      "category": "external",
+      "name": "PagerDuty Notifier",
+      "reason": "external system \u2014 kept as a stub until real credentials/wiring exist",
+      "resolution": "stub",
+      "tool_id": "pagerduty_api"
+    }
+  ],
+  "workflow": {
+    "category": "ops",
+    "name": "Support Ticket Triage and Reporting",
+    "pattern_declared": "router",
+    "slug": "support_ticket_triage_and_reporting"
+  }
+}
