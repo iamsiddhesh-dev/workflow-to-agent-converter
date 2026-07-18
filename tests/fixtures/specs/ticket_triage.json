@@ -1,0 +1,90 @@
+{
+  "agents": [
+    {
+      "backstory_hint": "Analytical support specialist with a focus on rapid classification and risk detection.",
+      "goal": "Read incoming tickets, label them by category, and detect urgent issues.",
+      "id": "triage_agent",
+      "role": "Ticket Classifier"
+    },
+    {
+      "backstory_hint": "Reliable systems monitor who ensures critical incidents are never missed.",
+      "goal": "Trigger immediate alerts for high-priority issues via PagerDuty.",
+      "id": "alert_agent",
+      "role": "On-Call Notifier"
+    },
+    {
+      "backstory_hint": "Data-oriented analyst who excels at distilling large volumes of tickets into actionable insights.",
+      "goal": "Compile a weekly summary of ticket trends and volume.",
+      "id": "reporter_agent",
+      "role": "Operations Analyst"
+    }
+  ],
+  "ambiguities": [
+    "Should the report be emailed, posted to Slack, or saved as a document in a specific system?"
+  ],
+  "assumptions": [
+    "The weekly report is generated on a set schedule at the end of the week.",
+    "Urgent criteria includes keywords like 'down', 'broken', 'can't login', or 'losing money'."
+  ],
+  "flow": {
+    "edges": [
+      [
+        "classify_ticket",
+        "trigger_alert"
+      ]
+    ],
+    "pattern": "router"
+  },
+  "tasks": [
+    {
+      "agent_id": "triage_agent",
+      "depends_on": [],
+      "description": "Read the Zendesk ticket content and categorize it as bug, billing, or question, while checking for urgency keywords.",
+      "expected_output": "Category label and an urgency status (boolean).",
+      "human_checkpoint": false,
+      "id": "classify_ticket"
+    },
+    {
+      "agent_id": "alert_agent",
+      "depends_on": [
+        "classify_ticket"
+      ],
+      "description": "If the ticket is marked as urgent, trigger an immediate notification via PagerDuty.",
+      "expected_output": "Confirmation of PagerDuty alert if triggered.",
+      "human_checkpoint": false,
+      "id": "trigger_alert"
+    },
+    {
+      "agent_id": "reporter_agent",
+      "depends_on": [],
+      "description": "Aggregate all tickets received during the week to produce a report on category volume and trends.",
+      "expected_output": "A weekly summary document showing counts of bugs, billing, and questions with noted spikes.",
+      "human_checkpoint": false,
+      "id": "generate_weekly_report"
+    }
+  ],
+  "tools": [
+    {
+      "category": "external",
+      "id": "zendesk_api",
+      "inputs": "ticket ID",
+      "name": "Zendesk Connector",
+      "outputs": "ticket content and current metadata",
+      "purpose": "Read ticket content and update ticket labels."
+    },
+    {
+      "category": "external",
+      "id": "pagerduty_api",
+      "inputs": "alert details",
+      "name": "PagerDuty Notifier",
+      "outputs": "API success confirmation",
+      "purpose": "Send urgent notifications to the on-call engineer."
+    }
+  ],
+  "workflow": {
+    "category": "ops",
+    "description": "Categorize incoming Zendesk support tickets, alert on-call staff for urgent issues, and generate a weekly analytical summary.",
+    "name": "Support Ticket Triage and Reporting",
+    "trigger": "A new ticket arrives in Zendesk."
+  }
+}

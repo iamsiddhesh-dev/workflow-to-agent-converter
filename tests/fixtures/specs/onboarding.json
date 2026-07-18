@@ -1,0 +1,116 @@
+{
+  "agents": [
+    {
+      "backstory_hint": "Tech-savvy specialist who manages hardware and system access with precision.",
+      "goal": "Ensure all physical hardware and software access is provisioned correctly for the new hire.",
+      "id": "it_provisioner",
+      "role": "Onboarding Provisioner"
+    },
+    {
+      "backstory_hint": "Highly organized administrator focused on employee experience and clear documentation.",
+      "goal": "Ensure smooth communication and manager preparedness for the new hire.",
+      "id": "onboarding_coord",
+      "role": "Onboarding Coordinator"
+    },
+    {
+      "backstory_hint": "Detail-oriented observer who cross-references systems to identify gaps.",
+      "goal": "Verify that all onboarding steps were successfully completed and report discrepancies.",
+      "id": "audit_specialist",
+      "role": "Onboarding Auditor"
+    }
+  ],
+  "ambiguities": [],
+  "assumptions": [
+    "The provisioning tool correctly identifies the team's stack (Engineering vs Sales) based on input data.",
+    "The 'few days before' timing is defined as 3 business days prior to the start date.",
+    "The audit happens exactly 7 days after the start date."
+  ],
+  "flow": {
+    "edges": [
+      [
+        "provision_resources",
+        "perform_audit"
+      ],
+      [
+        "send_welcome_comms",
+        "create_manager_checklist"
+      ],
+      [
+        "create_manager_checklist",
+        "perform_audit"
+      ]
+    ],
+    "pattern": "sequential"
+  },
+  "tasks": [
+    {
+      "agent_id": "it_provisioner",
+      "depends_on": [],
+      "description": "Order the new hire's laptop and configure necessary accounts for email, Slack, and team-specific software (Engineering vs Sales stack).",
+      "expected_output": "Confirmation report of hardware orders and created system accounts.",
+      "human_checkpoint": false,
+      "id": "provision_resources"
+    },
+    {
+      "agent_id": "onboarding_coord",
+      "depends_on": [],
+      "description": "Send a welcome email a few days prior to the start date containing arrival logistics, meeting details, and start time.",
+      "expected_output": "Welcome communication delivered to the new hire.",
+      "human_checkpoint": false,
+      "id": "send_welcome_comms"
+    },
+    {
+      "agent_id": "onboarding_coord",
+      "depends_on": [
+        "send_welcome_comms"
+      ],
+      "description": "Generate an intro-meeting checklist document for the manager to use during the new hire's first week.",
+      "expected_output": "A structured checklist document for the manager.",
+      "human_checkpoint": false,
+      "id": "create_manager_checklist"
+    },
+    {
+      "agent_id": "audit_specialist",
+      "depends_on": [
+        "provision_resources",
+        "create_manager_checklist"
+      ],
+      "description": "One week after the start date, query the HRIS and internal systems to verify account access and equipment arrival; flag any outstanding items.",
+      "expected_output": "An exception report highlighting missing assets or account access.",
+      "human_checkpoint": false,
+      "id": "perform_audit"
+    }
+  ],
+  "tools": [
+    {
+      "category": "external",
+      "id": "hris_query",
+      "inputs": "employee identifier",
+      "name": "HRIS Query Tool",
+      "outputs": "department details and hire status",
+      "purpose": "Access employee data and department-specific information from the HR system."
+    },
+    {
+      "category": "external",
+      "id": "messaging_tool",
+      "inputs": "recipient, message body",
+      "name": "Multi-channel Notifier",
+      "outputs": "delivery confirmation",
+      "purpose": "Send welcome emails and internal notifications via Slack and email."
+    },
+    {
+      "category": "builtin",
+      "id": "doc_generator",
+      "inputs": "new hire data, role",
+      "name": "Document Builder",
+      "outputs": "checklist document file",
+      "purpose": "Generate the manager's first-week checklist document."
+    }
+  ],
+  "workflow": {
+    "category": "ops",
+    "description": "Standardize the onboarding process by automating equipment ordering, account provisioning, welcome communications, and manager checklist creation, followed by a post-onboarding audit.",
+    "name": "Employee Onboarding Automation",
+    "trigger": "HR provides a new hire's start date."
+  }
+}

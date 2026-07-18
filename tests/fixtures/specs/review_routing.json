@@ -1,0 +1,70 @@
+{
+  "agents": [
+    {
+      "backstory_hint": "Systematic analyst skilled at categorizing file changes based on path patterns.",
+      "goal": "Examine PR diffs to determine ownership areas and identify sensitive file patterns.",
+      "id": "code_analyst",
+      "role": "Code Change Analyst"
+    },
+    {
+      "backstory_hint": "Workflow expert focused on developer velocity and risk mitigation.",
+      "goal": "Assign PRs to appropriate subject matter experts and flag sensitive PRs for secondary review.",
+      "id": "reviewer_coordinator",
+      "role": "Reviewer Coordinator"
+    }
+  ],
+  "ambiguities": [
+    "Do you have an existing list of mapping of file paths to team roles, or should the agent derive this from team structure?",
+    "Should the system default to assigning to the PR author's team if a file has no clear owner pattern?"
+  ],
+  "assumptions": [
+    "Files in /auth/ or /payments/ paths are automatically classified as sensitive.",
+    "Non-sensitive PRs are assigned to a single reviewer from the general on-call rotation.",
+    "Trivial PRs (docs/config) are assigned to any available developer."
+  ],
+  "flow": {
+    "edges": [
+      [
+        "analyze_files",
+        "assign_reviewers"
+      ]
+    ],
+    "pattern": "router"
+  },
+  "tasks": [
+    {
+      "agent_id": "code_analyst",
+      "depends_on": [],
+      "description": "Analyze the changed files in the PR, matching them against ownership patterns (/auth/, /payments/) and determining if it qualifies as small/trivial documentation or config changes.",
+      "expected_output": "A report identifying the ownership area, sensitivity status (e.g., sensitive vs standard), and change size (trivial vs significant).",
+      "human_checkpoint": false,
+      "id": "analyze_files"
+    },
+    {
+      "agent_id": "reviewer_coordinator",
+      "depends_on": [
+        "analyze_files"
+      ],
+      "description": "Based on the analysis, assign the PR to the relevant subject matter expert or on-call engineer via GitHub API. If sensitive, flag for a second reviewer.",
+      "expected_output": "Confirmation of PR assignment to the correct reviewer(s) on GitHub.",
+      "human_checkpoint": false,
+      "id": "assign_reviewers"
+    }
+  ],
+  "tools": [
+    {
+      "category": "external",
+      "id": "github_api",
+      "inputs": "PR identifier",
+      "name": "GitHub API",
+      "outputs": "Diff content and assignment status",
+      "purpose": "Fetch PR diffs and perform review assignments."
+    }
+  ],
+  "workflow": {
+    "category": "dev",
+    "description": "Automatically route PRs to the correct subject matter experts based on file changes and flag sensitive changes for mandatory secondary review.",
+    "name": "Intelligent PR Routing and Assignment",
+    "trigger": "A pull request is opened in GitHub."
+  }
+}
